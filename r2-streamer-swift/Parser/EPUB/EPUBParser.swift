@@ -111,7 +111,7 @@ final public class EpubParser: PublicationParser {
         if ((try? container.data(relativePath: EPUBConstant.lcplFilePath)) != nil) {
             return DRM(brand: .lcp)
         }
-         return nil
+        return nil
     }
   
     
