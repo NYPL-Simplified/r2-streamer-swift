@@ -118,16 +118,14 @@ final public class EpubParser: PublicationParser {
     /// Check license files at the book location.
     /// Adobe or LCP DRM licence can be a separate file, not included into .epub archive.
     /// - Parameter url: File URL
-    /// - Returns: A DRM, if any found.
+    /// - Returns: Adobe DRM, LCP DRm or nil if no license file is found
     private static func scanForDRM(at url: URL) -> DRM? {
         // LCP DRM license file has .lcpl extension
-        let lcpPath = url.path.replacingOccurrences(of: ".\(url.pathExtension)", with: ".lcpl")
-        if FileManager.default.fileExists(atPath: lcpPath) {
+        if FileManager.default.fileExists(atPath: DRM.Brand.lcp.licenseFile(for: url).path) {
             return DRM(brand: .lcp)
         }
         // Adobe DRM license file has "_rights.xml" suffix, as defined in ADEPT library
-        let adobePath = "\(url.path)_rights.xml"
-        if FileManager.default.fileExists(atPath: adobePath) {
+        if FileManager.default.fileExists(atPath: DRM.Brand.adobe.licenseFile(for: url).path) {
             return DRM(brand: .adobe)
         }
         return nil
