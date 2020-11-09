@@ -61,8 +61,8 @@ final public class EpubParser: PublicationParser {
         let path = url.path
         // Generate the `Container` for `fileAtPath`
         var container = try generateContainerFrom(fileAtPath: path)
-        
-        let drm = scanForDRM(in: container)
+        // Look for license files at the file location and inside the file
+        let drm = scanForDRM(at: url) ?? scanForDRM(in: container)
         // `Encryption` indexed by HREF.
         let encryptions = (try? EPUBEncryptionParser(container: container, drm: drm))?.parseEncryptions() ?? [:]
 
@@ -111,10 +111,24 @@ final public class EpubParser: PublicationParser {
         if ((try? container.data(relativePath: EPUBConstant.lcplFilePath)) != nil) {
             return DRM(brand: .lcp)
         }
-        
-        return DRM(brand: .adobe)
-        
-        // return nil
+        return nil
+    }
+  
+    
+    /// Check license files at the book location.
+    /// Adobe or LCP DRM licence can be a separate file, not included into .epub archive.
+    /// - Parameter url: File URL
+    /// - Returns: Adobe DRM, LCP DRm or nil if no license file is found
+    private static func scanForDRM(at url: URL) -> DRM? {
+        // LCP DRM license file has .lcpl extension
+        if FileManager.default.fileExists(atPath: DRM.Brand.lcp.licenseFile(for: url).path) {
+            return DRM(brand: .lcp)
+        }
+        // Adobe DRM license file has "_rights.xml" suffix, as defined in ADEPT library
+        if FileManager.default.fileExists(atPath: DRM.Brand.adobe.licenseFile(for: url).path) {
+            return DRM(brand: .adobe)
+        }
+        return nil
     }
 
     /// Attempt to fill the `Publication`'s `tableOfContent`, `landmarks`, `pageList` and `listOfX` links collections using the navigation document.
