@@ -17,21 +17,19 @@ import R2Shared
 /// A parser module which provide methods to parse encrypted XML elements.
 final class EPUBEncryptionParser: Loggable {
     
-    private let container: Container
+    private let fetcher: Fetcher
     private let data: Data
-    private let drm: DRM?
 
-    init(container: Container, data: Data, drm: DRM?) {
-        self.container = container
+    init(fetcher: Fetcher, data: Data) {
+        self.fetcher = fetcher
         self.data = data
-        self.drm = drm
     }
     
-    convenience init(container: Container, drm: DRM?) throws {
-        let path = "META-INF/encryption.xml"
+    convenience init(fetcher: Fetcher) throws {
+        let path = "/META-INF/encryption.xml"
         do {
-            let data = try container.data(relativePath: path)
-            self.init(container: container, data: data, drm: drm)
+            let data = try fetcher.readData(at: path)
+            self.init(fetcher: fetcher, data: data)
         } catch {
             throw EPUBParserError.missingFile(path: path)
         }
@@ -62,31 +60,19 @@ final class EPUBEncryptionParser: Loggable {
             {
                 continue
             }
-            resourceURI = normalize(base: "/", href: resourceURI)
+            resourceURI = HREF(resourceURI, relativeTo: "/").string
 
             var scheme: String?
             var originalLength: Int?
             var compression: String?
-            var profile: String?
-            
+
             // LCP. Tag LCP protected resources.
+            // FIXME: Move to ContentProtection?
             let keyInfoURI = encryptedDataElement.firstChild(xpath: "ds:KeyInfo/ds:RetrievalMethod")?.attr("URI")
-            if keyInfoURI == "license.lcpl#/encryption/content_key", drm?.brand == DRM.Brand.lcp {
-                scheme = drm?.scheme.rawValue
+            if keyInfoURI == "license.lcpl#/encryption/content_key" {
+                scheme = "http://readium.org/2014/01/lcp"
             }
-            
-            // FIXME: Move that to ContentProtection
-            if let licenseLCPLData = try? container.data(relativePath: "META-INF/license.lcpl"),
-                let licenseLCPL = try? JSONSerialization.jsonObject(with: licenseLCPLData) as? [String: Any],
-                let encryptionDict = licenseLCPL["encryption"] as? [String: Any]
-            {
-                profile = encryptionDict["profile"] as? String
-            }
-            // LCP END.
-            
-            if drm?.brand == .adobe {
-                scheme = drm?.scheme.rawValue
-            }
+            // END LCP
 
             for encryptionProperty in encryptedDataElement.xpath("enc:EncryptionProperties/enc:EncryptionProperty") {
                 // Check that we have a compression element, with originalLength, not empty.
@@ -104,7 +90,6 @@ final class EPUBEncryptionParser: Loggable {
                 algorithm: algorithm,
                 compression: compression,
                 originalLength: originalLength,
-                profile: profile,
                 scheme: scheme
             )
         }
